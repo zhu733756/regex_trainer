@@ -1,8 +1,20 @@
 ## regular_trainer
 #### 项目功能：
- 1 一个支持新闻网站逆向正则生成规则的scrapy项目
+ 1 支持目标新闻网站文章正则rule生成，无需再编写crawlspier的rule逻辑;
  
- 2 支持现有网站中大部分字段的文本密度提取器，核心代码参考来源[kingname/GeneralNewsExtractor](https://github.com/kingname/GeneralNewsExtractor)
+ 2 支持现有网站中大部分字段的文本密度提取器，无需再手写xpath，靠爬虫自行总结，文本密度提取逻辑参考[kingname/GeneralNewsExtractor](https://github.com/kingname/GeneralNewsExtractor);
+ 
+ 3 手动对批量link进行正则总结，可参考regex_trainer\tools\regex_collection.py
+ ```
+ t = RegexCollection("http://www.bjmy.gov.cn/", prefix=".*")
+ t.add('http://www.bjmy.gov.cn/col/col129/index.html')
+ t.add('http://www.bjmy.gov.cn/col/col3334/index.html')
+ t.add('http://www.bjmy.gov.cn/art/2020/1/2/art_2052_6.html')
+ t.add('http://www.bjmy.gov.cn/art/2020/1/2/art_2055_17.html')
+ print(trie.extract())
+
+ [('.*/col/col\\d+/index.html', 3, 1, 2), ('.*/art/2020/1/2/art_205[_\\d]+.html', 5, 2, 2)]
+ ```
 
 #### 项目启动配置
 
