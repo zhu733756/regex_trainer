@@ -17,6 +17,7 @@
  
  2 数据库建表
  
+```
  CREATE TABLE `core_website_xpath` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `web_name` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL,
@@ -27,8 +28,9 @@
   UNIQUE KEY `web_version` (`web_name`,`version`) USING BTREE
  ) ENGINE=InnoDB AUTO_INCREMENT=75 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci 
  ROW_FORMAT=DYNAMIC;
-
- CREATE TABLE `core_website_config` (
+```
+```
+CREATE TABLE `core_website_config` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `web_name` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL,
   `start_urls` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci DEFAULT NULL,
@@ -39,6 +41,7 @@
   UNIQUE KEY `web_name_regex` (`web_name`,`article_regex`) USING BTREE
 ) ENGINE=InnoDB AUTO_INCREMENT=76 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci ROW_FORMAT=DYNAMIC;
 
+```
 #### 项目运行
 
 1 pip install -r requirements.txt
