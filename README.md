@@ -1,6 +1,7 @@
 ## regular_trainer
 #### 项目功能：
  1 一个支持新闻网站逆向正则生成规则的scrapy项目
+ 
  2 支持现有网站中大部分字段的文本密度提取器，核心代码参考来源[kingname/GeneralNewsExtractor](https://github.com/kingname/GeneralNewsExtractor)
 
 #### 项目启动配置
