@@ -1,0 +1,92 @@
+# -*- coding:utf-8 -*-
+# @Author: zhu733756
+# @Time: 2020/4/13
+# @Description:
+from datetime import datetime
+import json
+import os
+import sys
+import pathlib
+import numpy as np
+
+import scrapy
+from scrapy.crawler import CrawlerProcess
+from scrapy.http import Request, HtmlResponse
+from scrapy.spiders import Rule
+from scrapy.spiders import CrawlSpider
+from scrapy.linkextractors import LinkExtractor
+from ..tools.trie import Trie
+from ..extractor.total_extractor import SmartGuessExtractor
+
+import random
+from tldextract import tldextract
+import codecs
+
+MAX_ITEM_COUNT = 100
+MAX_LINK_COUNT = 20
+MAX_LINK_PERCENT = 0.5
+
+
+class ${capfilename}Spider(CrawlSpider):
+    name = '${name}'
+    rules = (
+        Rule(LinkExtractor(allow=('${article_rule}')),
+             callback='parse_article', follow=False),
+        Rule(LinkExtractor(deny=('${article_rule}')), follow=True),
+    )
+    allowed_domains = ${allowed_domains}
+    start_urls = ${start_urls}
+    trie = Trie(start_urls[0], prefix=".*")
+    domains_set = set()
+    domain = tldextract.extract(start_urls[0]).domain
+    extractor = SmartGuessExtractor.from_config(config_name='${name}')
+    count = 0
+    custom_settings = {
+        'DEPTH_LIMIT': 3
+    }
+
+    def set_allowed_domains(self, url):
+        domain_val = tldextract.extract(url)
+        if domain_val.domain == self.domain:
+            domains = "{}.{}.{}".format(
+                domain_val.subdomain, domain_val.domain, domain_val.suffix)
+            self.domains_set.add(domains)
+
+    def _requests_to_follow(self, response):
+        if not isinstance(response, HtmlResponse):
+            return
+        seen = set()
+        for n, rule in enumerate(self._rules):
+            links = [lnk for lnk in rule.link_extractor.extract_links(response)
+                     if lnk not in seen]
+            if links and rule.process_links:
+                links = rule.process_links(links)
+            # get samples
+            links = np.random.choice(links, int(len(links) * MAX_LINK_PERCENT))
+            for link in links:
+                seen.add(link)
+                r = self._build_request(n, link)
+                yield rule.process_request(r)
+
+    def parse_article(self, response):
+        if self.count > MAX_ITEM_COUNT:
+            self.crawler.engine.close_spider(self, '抓取数量已达上限')
+        self.count += 1
+        # allowed domains
+        self.set_allowed_domains(response.url)
+        # add train
+        self.trie.add(response.url)
+        # add html
+        self.extractor.add_html(response.body.decode())
+
+        try:
+            content_infos = self.extractor.extract()
+            yield content_infos
+        except Exception as e:
+            print(f"采集报错:{e.args},url={response.url}")
+
+if __name__ == "__main__":
+    from scrapy.crawler import CrawlerProcess
+    process = CrawlerProcess(get_project_settings())
+    process.crawl(${capfilename}Spider)
+    process.start()
