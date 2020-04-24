@@ -12,6 +12,7 @@
  MYSQL_USER = 'xxxx'
  MYSQL_PASSWORD = 'xxxx'
  ```
+
  2 数据库建表
  CREATE TABLE `core_website_xpath` (
   `id` int(11) NOT NULL AUTO_INCREMENT,

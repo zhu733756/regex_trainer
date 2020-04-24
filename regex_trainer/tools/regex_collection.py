@@ -110,12 +110,12 @@ def from_csv(path, encoding="utf-8"):
         target = list(
             set(pd.read_csv(path, encoding=encoding).loc[:, "link"].values))
         start = "https" if target[0].startswith("https") else "http"
-        trie = RegexCollection(
+        t = RegexCollection(
             f"{start}://" + target[0].split("/")[2], prefix=".*")
         for link in target:
-            trie.add(link)
+            t.add(link)
         else:
-            return trie.extract(nums=100)
+            return t.extract(nums=100)
     except Exception as e:
         print(e.args)
 
@@ -138,12 +138,9 @@ def from_txt(path):
 
 
 if __name__ == '__main__':
-    # trie = RegexCollection("http://www.bjmy.gov.cn/", prefix=".*")
-    # trie.add('http://www.bjmy.gov.cn/col/col129/index.html')
-    # trie.add('http://www.bjmy.gov.cn/col/col3334/index.html')
-    # trie.add('http://www.bjmy.gov.cn/art/2020/1/2/art_2052_6.html')
-    # trie.add('http://www.bjmy.gov.cn/art/2020/1/2/art_2055_17.html')
-    # print(trie.extract())
-    # print(from_csv("C:\\Users\\Lenovo\\Desktop\\core_urls_category.csv", encoding="gbk"))
-    from_txt(
-        r'E:\MyCode\regular_trainer\regex_trainer\regex_trainer\caches\解放网\links.json')
+    t = RegexCollection("http://www.bjmy.gov.cn/", prefix=".*")
+    t.add('http://www.bjmy.gov.cn/col/col129/index.html')
+    t.add('http://www.bjmy.gov.cn/col/col3334/index.html')
+    t.add('http://www.bjmy.gov.cn/art/2020/1/2/art_2052_6.html')
+    t.add('http://www.bjmy.gov.cn/art/2020/1/2/art_2055_17.html')
+    print(t.extract())
