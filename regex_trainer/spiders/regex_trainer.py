@@ -104,7 +104,10 @@ class RegexTrainerSpider(CrawlSpider):
             for link in links:
                 seen.add(link)
                 r = self._build_request(n, link)
-                yield rule.process_request(r)
+                try:
+                    yield rule.process_request(r)
+                except:
+                    yield rule.process_request(r, response)
 
     def parse_article(self, response):
         if self.count > MAX_ITEM_COUNT:
@@ -121,5 +124,3 @@ class RegexTrainerSpider(CrawlSpider):
             yield content_infos
         except Exception as e:
             print(f"采集报错:{e.args},url={response.url}")
-
-
