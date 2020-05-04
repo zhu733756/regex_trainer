@@ -100,7 +100,8 @@ class RegexCollection(object):
                         prefix_regex += ".*"
                     nodes.append(prefix_regex)
                 nodes = self.prefix + "/" + "/".join(nodes)
-                res.append((nodes, key, char_length, len(char_values[0]), ))
+                if len(char_values) > 0:
+                    res.append((nodes, key, char_length, len(char_values[0])))
         return sorted(res, key=lambda x: x[-1], reverse=True)[:nums]
 
 
