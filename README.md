@@ -58,9 +58,7 @@ CREATE TABLE `core_website_config` (
 
 1 pip install -r requirements.txt
 
-2 保证安装了scrapy运行环境以及tldextract(如果有其他包没安装,请pip install xxx)
-
-3 进入 run.py 的目录, 修改命令行,修改自定义参数(-a 以及-s ),具体可参考scrapy命令行;
+2 进入 run.py 的目录, 修改命令行,修改自定义参数(-a 以及-s ),具体可参考scrapy命令行;
 ``` python
 python run.py
 ```
