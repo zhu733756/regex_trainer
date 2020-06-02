@@ -125,7 +125,7 @@ class TimeExtractor(BaseExtractor):
             if dt_obj:
                 rel.update({
                     "xpath": self.guess_xpath(dt_obj.group(1)),
-                    "value": str(self.to_date_field(dt_obj.group(1))),
+                    "value": str(self.to_date_field(dt_obj.group(1)) or ''),
                     "regex": dt
                 })
                 break

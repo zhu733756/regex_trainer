@@ -16,28 +16,35 @@ from collections import namedtuple
 from ..tools.regex_collection import RegexCollection
 from scrapy import Item, Field
 from copy import copy
+import re
 
 
-class CoreWebConfigItem(Item):
+class CoreWebsiteConsumer(Item):
     web_name = Field()
     start_urls = Field()
+    status = Field()
+    version = Field()
     allowed_domains = Field()
     article_regex = Field()
-    created_at = Field()
-
-
-class CoreWebXpathItem(Item):
-    web_name = Field()
-    version = Field()
-    config = Field()
+    job_id = Field()
     updated_at = Field()
 
+
+class CoreWebXpathConfigItem(Item):
+    web_name = Field()
+    job_id = Field()
+    version = Field()
+    config = Field()
+    sample = Field()
+    sample_values = Field()
+    created_at = Field()
+
 MYSQL_TABLE_MAPPING = [{
-    "table": "core_website_config",
-    "item": "CoreWebConfigItem"
+    "table": "core_website_trainer_consumer",
+    "item": "CoreWebsiteConsumer"
 }, {
-    "table": "core_website_xpath",
-    "item": "CoreWebXpathItem"
+    "table": "core_website_xpath_config",
+    "item": "CoreWebXpathConfigItem"
 }]
 
 
@@ -88,92 +95,105 @@ class RegexSpiderPipeline(object):
         self.config_filepath = str(self.config_path.joinpath(
             f"{spider.spider_name}.ini"))
 
-        self.file = codecs.open(self.target_filepath, 'w+', encoding='utf-8')
-        self.article_links_file = codecs.open(
-            self.target_link_filepath, "a+", encoding='utf-8')
-        self.regex_collection = RegexCollection(spider.domain_url)
+        self.xpath_file = codecs.open(
+            self.target_filepath, 'a+', encoding='utf-8')
+        self.regex_collection = RegexCollection(spider.domain_url, prefix=".*")
         self.logger = spider.logger
+        self.job_id = spider.job_id
+        self.import_fields = ["channel", "title", "content", "publish_date"]
 
     def process_item(self, item, spider):
         if not item.get("content") or not item.get("title"):
             raise DropItem("content为空")
+        # 当重要字段中有两个以上字段没有采集到将此条item过滤
+        import_counts = [bool(item.get(f, {}).get("value", None))
+                         for f in self.import_fields].count(True)
+        if import_counts <= 2:
+            raise DropItem("重要字段缺失2个以上")
         line = json.dumps(dict(item), ensure_ascii=False) + "\n"
-        self.file.write(line)
-        self.article_links_file.write(item.get("url") + "\n")
+        self.xpath_file.write(line)
         self.regex_collection.add(item.get("url"))
         # self.dbpool.runInteraction(self.save_item, item)
         return item
 
     def close_spider(self, spider):
-        self.file.close()
-        self.article_links_file.close()
-        self._extract_common_xpath(spider.extractor)
+        self.xpath_file.close()
+        # get article rule
+        article_rule = self._extract_regex(spider.spider_name)
+        # filter by article rule
+        useful_content = self._filter_xpath_results(article_rule)
+        # keep useful links
+        self._keep_links(useful_content)
+        # get a sample
+        sample = json.loads(useful_content[0]).get("url") \
+            if len(useful_content) > 0 else ''
+        # extract it
+        sample_values = json.loads(useful_content[0])
+        # extract common xpath
+        self._extract_common_xpath(spider.extractor, useful_content)
         version, config_infos = self._saveAndreturn(spider.extractor)
-        item1 = self._gen_spider_xpath_infos(
-            spider.spider_name, version, config_infos)
-        item2 = self._gen_spider_infos(spider)
+        item1 = self._gen_spider_infos(spider, version, article_rule)
+        item2 = self._gen_spider_xpath_infos(
+            spider.spider_name, version, config_infos, sample, sample_values)
+        # save item
         for item in [item1, item2]:
             self.dbpool.runInteraction(self.save_item, item)
         self.logger.info('finish crawl: %s' % spider.spider_name)
 
-    def _gen_spider_xpath_infos(self, name, version, content):
-        item = CoreWebXpathItem()
-        item["web_name"] = name
-        item["version"] = int(version)
-        item["config"] = content
-        item["updated_at"] = datetime.now()
-        return item
+    def _filter_xpath_results(self, article_rule):
+        '''根据最佳匹配rule反向筛选link'''
+        content = codecs.open(self.target_filepath, "r",
+                              encoding="utf-8").read().split("\n")
+        return list(filter(lambda x: x and re.search(article_rule, json.loads(x).get("url", "")), content))
 
-    def _gen_spider_infos(self, spider):
-        item = CoreWebConfigItem()
-        for key in item.fields.keys():
-            if key == "article_regex":
-                value = self._extract_regex(spider.spider_name)
-            elif key == "web_name":
-                value = spider.spider_name
-            else:
-                value = getattr(spider, key, "")
-                if isinstance(value, (tuple, list)):
-                    value = json.dumps(list(value))
-            item[key] = value
-        item["created_at"] = datetime.now()
-        return item
+    def _keep_links(self, content):
+        article_links_file = codecs.open(
+            self.target_link_filepath, "w", encoding='utf-8')
+        for c in content:
+            if c:
+                line = json.loads(c).get("url")
+                article_links_file.write(line + "\n")
+        article_links_file.close()
 
     def _extract_regex(self, spider_name):
+        '''extract regex'''
         article_regex = self.regex_collection.extract()
         article_regex = article_regex[0][0] if len(article_regex) > 0 else ''
         print('{} article_regex is {}'.format(spider_name, article_regex))
         return article_regex
 
-    def _extract_common_xpath(self, extractor):
-        content = codecs.open(self.target_filepath, "r",
-                              encoding="utf-8").read().split("\n")
-        if content == "":
-            return
-
+    def _extract_common_xpath(self, extractor, content):
+        '''extract common xpath'''
         def _write_config(extractor, field, tp, field_set):
             if field_set and field in extractor.parser.sections():
                 extractor.parser.set(field, tp, list(field_set))
 
         fields = extractor.fields
-        for field in fields:
-            field_set = {}
-            for s in content:
-                if not s:
-                    continue
-                rel = json.loads(s).get(field, {})
-                xpath = rel.get("xpath", "")
-                regex = rel.get("regex", "")
-                if xpath:
-                    field_set.setdefault("xpath", set()).add(xpath)
-                if regex:
-                    field_set.setdefault("regex", set()).add(regex)
-            if field_set.get("xpath", None):
-                _write_config(
-                    extractor, field, "XPATH", field_set["xpath"])
-            if field_set.get("regex", None):
-                _write_config(
-                    extractor, field, "REGEX", field_set["regex"])
+        for s in content:
+            if not s:
+                continue
+            try:
+                data = json.loads(s)
+                field_set = {}
+                for field in fields:
+                    rel = data.get(field, {})
+                    if not bool(rel):
+                        continue
+                    xpath = rel.get("xpath", "")
+                    regex = rel.get("regex", "")
+                    if xpath:
+                        field_set.setdefault("xpath", set()).add(xpath)
+                    if regex:
+                        field_set.setdefault("regex", set()).add(regex)
+
+                if field_set.get("xpath", None):
+                    _write_config(
+                        extractor, field, "XPATH", field_set["xpath"])
+                if field_set.get("regex", None):
+                    _write_config(
+                        extractor, field, "REGEX", field_set["regex"])
+            except Exception as e:
+                print(e.args)
 
     def _saveAndreturn(self, extractor):
         '''save config and returns a tuple'''
@@ -185,6 +205,45 @@ class RegexSpiderPipeline(object):
         del config_dict["version"]
         config_content = json.dumps(config_dict)
         return version, config_content
+
+    def get_sample_values(self, url, extractor):
+        import requests
+        headers = {'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8', 'Accept-Language': 'en',
+                   'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/72.0.3626.109 Safari/537.36'}
+        response = requests.get(url, headers=headers)
+        if response.status_code == 200:
+            body = response.text
+            extractor.add_html(body)
+            return extractor.extract(clean_xpath=True)
+        return {}
+
+    def _gen_spider_xpath_infos(self, name, version, content, sample, sample_values):
+        item = CoreWebXpathConfigItem()
+        item["web_name"] = name
+        item["version"] = int(version)
+        item["job_id"] = self.job_id
+        item["config"] = content
+        item["sample"] = sample
+        item["sample_values"] = json.dumps(sample_values)
+        item["created_at"] = datetime.now()
+        return item
+
+    def _gen_spider_infos(self, spider, version, article_rule):
+        item = CoreWebsiteConsumer()
+        for key in item.fields.keys():
+            if key == "article_regex":
+                value = article_rule
+            elif key == "web_name":
+                value = spider.spider_name
+            else:
+                value = getattr(spider, key, "")
+                if isinstance(value, (tuple, list)):
+                    value = json.dumps(list(value))
+            item[key] = value
+        item["updated_at"] = datetime.now()
+        item["version"] = version
+        item["status"] = 1
+        return item
 
     def save_item(self, cur, item):
         self.logger.debug("save item:" + str(item.get("url")))

@@ -23,9 +23,9 @@ import codecs
 import re
 import json
 from copy import copy
+import uuid
 
 MAX_ITEM_COUNT = 100
-MAX_LINK_COUNT = 20
 MAX_LINK_PERCENT = 0.5
 
 
@@ -38,19 +38,20 @@ class RegexTrainerSpider(CrawlSpider):
     def __init__(self, *args, **kwargs):
         super(RegexTrainerSpider, self).__init__(*args, **kwargs)
         kwargs = copy(kwargs)
-        self.spider_name = kwargs.pop("web_name", None)
+        self.spider_name = kwargs.get("web_name", None)
         self.start_urls = self.keep_correct_type(
-            kwargs.pop("start_urls", None), "list")
+            kwargs.get("start_urls", None), "list")
+        self.job_id = kwargs.get("_job", str(uuid.uuid1()))
         self.target_domain = None
         allowed_domains = self.get_allowed_domains(
-            kwargs.pop("allowed_domains", None) or self.start_urls[0])
+            kwargs.get("allowed_domains", None) or self.start_urls[0])
         self.allowed_domains = self.keep_correct_type(allowed_domains, "list")
         self.domains_set = set()
         self.domain_url = self.get_domain_url()
         self.extractor = SmartGuessExtractor.from_config(
             config_name=self.spider_name)
         self.count = 0
-        article_rule = kwargs.pop("article_rule", ".*")
+        article_rule = kwargs.get("article_rule", ".*")
         deny_article_rule = article_rule if article_rule not in (
             ".*") else ".*s?html?.*"
         self.rules = (
@@ -59,6 +60,9 @@ class RegexTrainerSpider(CrawlSpider):
             Rule(LinkExtractor(deny=(f'{deny_article_rule}')), follow=True),
         )
         self._compile_rules()
+        kwargs_prints = ",".join(
+            [key.replace("_", "") + '=' + value for key, value in kwargs.items()])
+        self.logger.info(f'Spider kwargs: {kwargs_prints}')
 
     def keep_correct_type(self, values, needed="str"):
         if isinstance(values, str):
@@ -117,9 +121,9 @@ class RegexTrainerSpider(CrawlSpider):
         self.set_allowed_domains(response.url)
         # add html
         self.extractor.add_html(response.body.decode())
-
+        # get a sample
         try:
-            content_infos = self.extractor.extract()
+            content_infos = self.extractor.extract(clean_xpath=False)
             content_infos.update({"url": response.url})
             yield content_infos
         except Exception as e:

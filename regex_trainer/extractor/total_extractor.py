@@ -73,11 +73,30 @@ class XpathPoolingExtractor(object):
         query_fields = fields if fields else DEFAULT_FIELDS
         return cls(html=html, fields=query_fields)
 
-    def extract(self):
+    def clean(self, result):
+        data = {}
+        if result:
+            for key in self.fields:
+                kl = result.get(key, {})
+                if kl:
+                    del kl["value"]
+                    data[key] = kl
+        return data
+
+    def extract(self, clean_xpath=True):
         xpath_dict = {}
         for field in self.fields:
             data = self.generate_field_xpath(field)
             xpath_dict[field] = data
+        if clean_xpath:
+            xpath_dict = self.clean(xpath_dict)
+        return xpath_dict
+
+    def get_sample_values(self):
+        xpath_dict = {}
+        for field in self.fields:
+            data = self.generate_field_xpath(field)
+            xpath_dict[field] = data.get("value")
         return xpath_dict
 
 
@@ -167,7 +186,7 @@ class SmartGuessExtractor(object):
         '''handle scrapy response'''
         base_dir = CONFIG_INI_BASE_DIR
         config_path = base_dir.joinpath(f"{config_name}.ini")
-        if not pathlib.Path(config_path).exists():
+        if not pathlib.Path(config_path).exists() or kwargs.pop("retraining", False):
             config_path = base_dir.joinpath("website.ini")
         parser = ConfigParser.RawConfigParser()
         parser.read(config_path, encoding="utf-8")
@@ -207,6 +226,20 @@ class SmartGuessExtractor(object):
             ret.update({field: func_results})
         if clean_xpath:
             ret = self.clean(ret)
+        return ret
+
+    def get_sample_values(self):
+        ret = {}
+        for field in self.fields:
+            if field in ["content", "origin_image_list", "video_url",
+                         "htmlcontent", "leadtitle", "subtitle"]:
+                value = self.content_infos.get(field, '').get("value", '')
+                ret.update({field: value})
+                continue
+            func = getattr(self, f"{field}_extractor", None)
+            func_results = func.extract() if func else {}
+            value = func_results.get(field, '').get("value", '')
+            ret.update({field: value})
         return ret
 
 if __name__ == "__main__":

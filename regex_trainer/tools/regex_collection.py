@@ -1,6 +1,8 @@
 from collections import defaultdict, OrderedDict
 import re
 from dateparser.date import DateDataParser
+import numpy as np
+import pandas as pd
 
 charaters = ["?", "&", "=", ".", "_", "+"]
 
@@ -16,23 +18,16 @@ class RegexCollection(object):
         '''
         self.domains = domains if not domains.endswith("/") else domains[:-1]
         self.prefix = prefix or self.domains
+        self.buckets = {}
+        self.short_urls = []
 
     def _pre_nodes(self, s: str) -> list:
         '''split and keep date format with one node'''
         return [n for n in s.split("/")[3:] if n]
 
     def add(self, s: str):
-        """Add a string to this trie."""
-        nodes = self._pre_nodes(s)
-        length = len(nodes)
-        char_length = len([i for i in charaters if i in s])
-        char_bucket = self.buckets.setdefault(
-            length, {}).setdefault(char_length, [None] * length)
-        for i in range(length):
-            if char_bucket[i] is None:
-                char_bucket[i] = [nodes[i]]
-            else:
-                char_bucket[i].append(nodes[i])
+        """Add a string to buckets."""
+        self.short_urls.append("/".join(self._pre_nodes(s)))
 
     def longest_common_prefix(self, strs: list) -> str:
         '''
@@ -56,9 +51,11 @@ class RegexCollection(object):
         获取字符串列表的匹配正则通式
         '''
         # 获取最长匹配前缀
-        prefix = self.longest_common_prefix(strs)
+        prefix = self.longest_common_prefix(
+            strs).replace("?", "\?").replace("+", "\+").replace(".", "\.")
         # 获取最长匹配尾缀
-        append = self.longest_common_prefix([s[::-1] for s in strs])
+        append = self.longest_common_prefix(
+            [s[::-1] for s in strs]).replace("?", "\?").replace("+", "\+").replace(".", "\.")
         prefix_length = len(prefix)
         append_length = len(append)
         if append_length > 0 and prefix_length + append_length < len(max(strs)):
@@ -79,13 +76,46 @@ class RegexCollection(object):
             prefix += f'[{c}{alum}]+'
         else:
             prefix += f'{alum}+'
+        if alum == "\w":
+            append = re.sub("\w+", '', append)
         return prefix + append[::-1]
+
+    def handle_abnormal(self, short_urls):
+        '''
+        计算现有urls的平均长度
+        异常值（outlier）是指一组测定值中与平均值的偏差超过两倍标准差的测定值，与平均值的偏差超过三倍。
+        '''
+        short_urls_array = pd.Series(short_urls).astype("str")
+        count_array = short_urls_array.str.len()
+        arraystd = np.std(count_array)
+        arraymean = np.mean(count_array)
+        arrayoutlier = np.transpose(
+            np.where(np.abs(count_array - arraymean) < 2 * arraystd))  # or 2*arraystd)
+        return [short_urls_array[int(index)] for index in arrayoutlier]
+
+    def prepared(self):
+        '''generate buckets'''
+        short_urls = self.handle_abnormal(self.short_urls)
+        for s in short_urls:
+            nodes = s.split("/")
+            node_length = len(nodes)
+            # 计算特殊字符
+            char_length = len([i for i in charaters if i in s])
+            char_bucket = self.buckets.setdefault(
+                node_length, {}).setdefault(char_length, [None] * node_length)
+            for i in range(node_length):
+                if char_bucket[i] is None:
+                    char_bucket[i] = [nodes[i]]
+                else:
+                    char_bucket[i].append(nodes[i])
 
     def extract(self, nums=5) -> list:
         '''
         return the top nums of the results
         nums:int
+        self.buckets: {节点数:{特殊字符数量:[node1],[node2]}}
         '''
+        self.prepared()
         res = []
         for key in self.buckets:
             char_bucket = self.buckets[key]
@@ -101,7 +131,9 @@ class RegexCollection(object):
                     nodes.append(prefix_regex)
                 nodes = self.prefix + "/" + "/".join(nodes)
                 if len(char_values) > 0:
-                    res.append((nodes, key, char_length, len(char_values[0])))
+                    # 正则, 节点长度，特殊字符个数, 特殊字符分桶数量
+                    res.append(
+                        (nodes, key, char_length, len(char_values[0])))
         return sorted(res, key=lambda x: x[-1], reverse=True)[:nums]
 
 
@@ -139,9 +171,11 @@ def from_txt(path):
 
 
 if __name__ == '__main__':
-    t = RegexCollection("http://www.bjmy.gov.cn/", prefix=".*")
-    t.add('http://www.bjmy.gov.cn/col/col129/index.html')
-    t.add('http://www.bjmy.gov.cn/col/col3334/index.html')
-    t.add('http://www.bjmy.gov.cn/art/2020/1/2/art_2052_6.html')
-    t.add('http://www.bjmy.gov.cn/art/2020/1/2/art_2055_17.html')
-    print(t.extract())
+    # t = RegexCollection("http://www.bjmy.gov.cn/", prefix=".*")
+    # t.add('http://www.bjmy.gov.cn/col/col129/index.html?0123')
+    # t.add('http://www.bjmy.gov.cn/col/col3334/index.html?0wewe')
+    # t.add('http://www.bjmy.gov.cn/art/2020/1/2/art_2052_6.html?0123')
+    # t.add('http://www.bjmy.gov.cn/art/2020/1/2/art_2055_17.html?0123')
+    # print(t.extract())
+    from_txt(
+        r'E:\MyCode\regular_trainer\regex_trainer\regex_trainer\caches\解放网\links.json')
