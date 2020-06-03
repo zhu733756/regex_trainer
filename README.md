@@ -30,29 +30,35 @@
  2 数据库建表
  
 ```
- CREATE TABLE `core_website_xpath` (
+CREATE TABLE `core_website_trainer_consumer` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
-  `web_name` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL,
-  `version` int(11) NOT NULL,
-  `config` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci,
-  `updated_at` datetime(6) DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP(6),
-  PRIMARY KEY (`id`) USING BTREE,
-  UNIQUE KEY `web_version` (`web_name`,`version`) USING BTREE
- ) ENGINE=InnoDB AUTO_INCREMENT=75 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci 
- ROW_FORMAT=DYNAMIC;
-```
-```
-CREATE TABLE `core_website_config` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `task_id` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci DEFAULT NULL,
   `web_name` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL,
   `start_urls` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci DEFAULT NULL,
+  `job_id` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci DEFAULT NULL,
   `allowed_domains` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci DEFAULT NULL,
   `article_regex` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci DEFAULT NULL,
   `created_at` datetime(6) DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP(6),
+  `updated_at` datetime(6) DEFAULT NULL,
+  `status` int(11) DEFAULT NULL,
+  `version` int(11) DEFAULT NULL,
   PRIMARY KEY (`id`) USING BTREE,
-  UNIQUE KEY `web_name_regex` (`web_name`,`article_regex`) USING BTREE
-) ENGINE=InnoDB AUTO_INCREMENT=76 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci ROW_FORMAT=DYNAMIC;
-
+  UNIQUE KEY `regex_trainer_task` (`web_name`,`job_id`) USING BTREE
+) ENGINE=InnoDB AUTO_INCREMENT=116 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci ROW_FORMAT=DYNAMIC;
+```
+```
+CREATE TABLE `core_website_xpath_config` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `web_name` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL,
+  `job_id` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci DEFAULT NULL,
+  `version` int(11) NOT NULL,
+  `sample` varchar(255) DEFAULT NULL,
+  `sample_values` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci,
+  `config` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci,
+  `created_at` datetime(6) DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP(6),
+  PRIMARY KEY (`id`) USING BTREE,
+  UNIQUE KEY `web_version` (`web_name`,`job_id`) USING BTREE
+) ENGINE=InnoDB AUTO_INCREMENT=92 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci ROW_FORMAT=DYNAMIC;
 ```
 #### 项目运行
 
